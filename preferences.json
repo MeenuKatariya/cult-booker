@@ -8,7 +8,7 @@
   "waitlistAsLastResort": true,
   "hotWindows": ["22:00"],
   "hotPollMs": 2000,
-  "coolPollMs": 30000,
+  "coolPollMs": 300000,
   "campUntil": "22:30",
   "dryRun": true
 }

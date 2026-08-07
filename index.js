@@ -8,10 +8,14 @@ const { loadAuth, loadPrefs } = require('./config');
 const HOST = 'https://www.cult.fit';
 const CLASSES = '/api/cult/classes/v2?productType=FITNESS';
 
-const HOT_BEFORE = 60_000;
+// A longer lead spends the rate limit budget and lands us in backoff as the day rolls.
+const HOT_BEFORE = 15_000;
 const HOT_AFTER = 180_000;
 const MAX_FAILS = 20;
 const BACKOFF = [5000, 10000, 20000, 30000, 60000];
+// Sleeping 30s through the opening is worse than being throttled.
+const HOT_BACKOFF = [2000, 3000, 5000];
+const TIMEOUT_MS = 20_000;
 
 let auth;
 
@@ -28,7 +32,7 @@ async function call(method, path) {
     method,
     headers: { ...auth.headers, Cookie: auth.cookie },
     body: method === 'POST' ? '{}' : undefined,
-    signal: AbortSignal.timeout(8000),
+    signal: AbortSignal.timeout(TIMEOUT_MS),
   });
 
   const text = await res.text();
@@ -210,6 +214,12 @@ async function run() {
     const now = Date.now();
     const hot = windows.some((t) => now >= t - HOT_BEFORE && now <= t + HOT_AFTER);
 
+    // Capped, or a long cool interval steps over the start of a hot window.
+    const upcoming = windows.map((t) => t - HOT_BEFORE).filter((t) => t > now).sort((a, b) => a - b);
+    const wait = hot
+      ? prefs.hotPollMs
+      : Math.min(prefs.coolPollMs, ...(upcoming.length ? [upcoming[0] - now] : []));
+
     let data;
     try {
       data = await getClasses();
@@ -219,15 +229,16 @@ async function run() {
       if (err.fatal) throw err;
 
       if (err.throttled) {
-        const wait = BACKOFF[Math.min(throttles++, BACKOFF.length - 1)];
-        log(`throttled, backing off ${wait / 1000}s`);
-        await sleep(wait);
+        const ladder = hot ? HOT_BACKOFF : BACKOFF;
+        const back = ladder[Math.min(throttles++, ladder.length - 1)];
+        log(`throttled, backing off ${back / 1000}s`);
+        await sleep(back);
         continue;
       }
 
       if (++fails >= MAX_FAILS) throw new Error(`giving up after ${fails} failures: ${err.message}`);
       log(`poll failed: ${err.message}`);
-      await sleep(hot ? prefs.hotPollMs : prefs.coolPollMs);
+      await sleep(wait);
       continue;
     }
 
@@ -260,7 +271,6 @@ async function run() {
     }
 
     if (picks.length && prefs.dryRun) {
-      // Keep camping so a dry run still shows when the window actually opened.
       if (saidWould !== picks[0].id) {
         saidWould = picks[0].id;
         log(`would book ${describe(picks[0])} on ${date}`);
@@ -274,7 +284,7 @@ async function run() {
       log('nothing bookable, still camping');
     }
 
-    await sleep(hot ? prefs.hotPollMs : prefs.coolPollMs);
+    await sleep(wait);
   }
 
   if (prefs.dryRun) return log('camp ended (dry run)');

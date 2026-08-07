@@ -2,11 +2,11 @@
 
 Books a cult.fit class as soon as the booking window opens.
 
-Cult lets you book 4 days ahead, and a new day is released every night around 22:00 IST. Popular
+Cult lets you book 4 days ahead, and a new day is released every night at 22:00 IST. Popular
 slots go within seconds. This sits on the API from well before the release, spots the new day the
 moment it appears, and books it.
 
-Node 20+, no dependencies.
+Node 22+, no dependencies.
 
 ## How it works
 
@@ -68,8 +68,12 @@ Two things to watch:
 `slots` and `preferences` are both ordered, and the search is slot-major: the first time is tried
 at every center before moving to the next time. `centerName` is only a label for the logs.
 
-`hotWindows` are the times it polls every `hotPollMs`, from a minute before to three minutes after.
-The rest of the camp runs at `coolPollMs`. All times are IST.
+`hotWindows` are the times it polls every `hotPollMs`, from 15 seconds before to three minutes
+after. The rest of the camp runs at `coolPollMs`. All times are IST.
+
+22:00 is confirmed by observation: a camp on 7 Aug 2026 logged the roll from 2026-08-10 to
+2026-08-11 just after 22:00. Midnight was tested separately and ruled out, since the days array
+slides forward at midnight without releasing a new day.
 
 ### 4. Try it
 
@@ -104,8 +108,17 @@ about a minute.
 429 is treated as back off, not as a failure: 5s, 10s, 20s, 30s, 60s, reset on the first success.
 A booking POST that gets a 429 waits and retries the same class instead of dropping to a worse one.
 
-This is why `hotPollMs` is 2000 and not 250. Being throttled during the race costs far more than
-polling a second slower. If the log fills with `throttled` lines, raise both intervals.
+Two things are tuned around this, both learned the hard way on a real night:
+
+Fast polling starts only 15 seconds before the window, not 60. Polling every 2s for a full minute
+beforehand spends the budget, and the first run tripped the limiter at 21:59:59 and was still in a
+30 second backoff when the day rolled, detecting it 80 seconds late.
+
+While inside a hot window the backoff ladder is 2s, 3s, 5s instead of 5s to 60s. Being throttled at
+22:00:00 and sleeping 30 seconds is worse than being throttled and retrying immediately.
+
+Requests time out at 20s. The original 8s filled the log with aborted polls, since runners reach
+cult from outside India.
 
 ## When it breaks
 
