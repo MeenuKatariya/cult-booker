@@ -82,16 +82,18 @@ records when the window opened.
 
 ### 5. Run it on GitHub Actions
 
-The repo has to be **public** for unlimited free minutes, since the job camps for over an hour.
-
 - Settings, Secrets and variables, Actions, Secrets: `CURL_COMMAND` set to the copied curl.
 - Same page, Variables: `DRY_RUN` set to `true`, flipped to `false` once a dry night looks right.
 
-Cron fires at 20:45 and 21:15 IST, well before the window, because GitHub's scheduler drifts 5 to
-30 minutes under load and occasionally skips a run entirely. It is only used to get a runner awake
-early; the camping loop is the real timer.
-
 Run it once by hand from the Actions tab to check the wiring.
+
+Cron fires at 20:00 IST, two hours ahead of the window, because GitHub's scheduler drifts 5 to 30
+minutes under load and sometimes skips a run entirely. It only gets a runner awake early; the
+camping loop is the real timer. The repo is public, so the ~135 minutes a night costs nothing.
+
+There is deliberately only one cron. A second one as backup either cancels the run already camping
+or, with `cancel-in-progress: false`, queues behind it and then camps toward the next day's
+deadline until it times out. Starting early covers drift better than a backup schedule does.
 
 ## Rate limiting
 
