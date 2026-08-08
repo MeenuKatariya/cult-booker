@@ -14,7 +14,14 @@ The classes API returns a `days` array whose last entry is the furthest bookable
 window opens, a new entry appears and that value changes. The script polls for exactly that, so it
 never needs to know the release time precisely.
 
-It then walks `slots` and `preferences` in order and books the first class with an open seat. Only
+Each 22:00 release opens release day + 4, so every run computes that target date from the clock
+and acts on it alone. Earlier days carry previous nights' bookings, and both exiting on them and
+booking around them are wrong. A run starting after 22:00 finds the target already out and books
+straight away; one starting before waits for it to appear, however late its first successful poll
+lands.
+
+Once the new day is out it walks `slots` and `preferences` in order and books the first class with
+an open seat. Only
 when every combination is full does it fall back to a waitlist, and it won't queue twice for the
 same day.
 

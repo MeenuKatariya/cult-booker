@@ -119,6 +119,14 @@ function nextAt(hhmm, from) {
   return at.getTime();
 }
 
+// Each 22:00 release opens release-day + 4.
+const DAYS_AHEAD = 4;
+
+function isoDate(ts) {
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 async function book(list) {
   for (const cls of list) {
     log(`booking ${describe(cls)}`);
@@ -197,14 +205,25 @@ async function list(args) {
 
 async function run() {
   const prefs = loadPrefs();
-  const deadline = nextAt(prefs.campUntil, Date.now());
-  const windows = prefs.hotWindows.map((w) => nextAt(w, Date.now()));
+  const start = Date.now();
 
-  log(`camping until ${new Date(deadline).toLocaleString('en-GB')}, dryRun=${prefs.dryRun}`);
+  let deadline = Math.min(nextAt(prefs.campUntil, start), start + 4 * 3600_000);
+  let windows = prefs.hotWindows.map((w) => nextAt(w, start));
 
-  let day = lastDay(await getClasses());
-  log(`furthest bookable day is ${day}`);
+  // Windows all past the deadline mean the release already happened: anchor to
+  // yesterday's occurrence and take one short shot instead of camping to tomorrow.
+  let anchor = windows.length ? Math.min(...windows) : nextAt('22:00', start);
+  if (anchor > deadline) anchor -= 86_400_000;
+  const target = isoDate(anchor + DAYS_AHEAD * 86_400_000);
 
+  if (windows.length && windows.every((t) => t > deadline)) {
+    windows = [start];
+    if (deadline - start > 30 * 60_000) deadline = start + 15 * 60_000;
+  }
+
+  log(`camping until ${new Date(deadline).toLocaleString('en-GB')}, target day ${target}, dryRun=${prefs.dryRun}`);
+
+  let day = null;
   let fails = 0;
   let throttles = 0;
   let saidWould = null;
@@ -219,18 +238,23 @@ async function run() {
     const wait = hot
       ? prefs.hotPollMs
       : Math.min(prefs.coolPollMs, ...(upcoming.length ? [upcoming[0] - now] : []));
+    // Recomputed at sleep time: a slow fetch must not push the wake past the window.
+    const nap = () => sleep(Math.min(wait, Math.max(250, (upcoming[0] ?? Infinity) - Date.now())));
 
     let data;
     try {
       data = await getClasses();
-      fails = 0;
       throttles = 0;
     } catch (err) {
       if (err.fatal) throw err;
 
       if (err.throttled) {
         const ladder = hot ? HOT_BACKOFF : BACKOFF;
-        const back = ladder[Math.min(throttles++, ladder.length - 1)];
+        // Same cap as the poll sleep: a 60s backoff must not sleep over the window.
+        const back = Math.min(
+          ladder[Math.min(throttles++, ladder.length - 1)],
+          Math.max(1000, (upcoming[0] ?? Infinity) - Date.now()),
+        );
         log(`throttled, backing off ${back / 1000}s`);
         await sleep(back);
         continue;
@@ -238,15 +262,34 @@ async function run() {
 
       if (++fails >= MAX_FAILS) throw new Error(`giving up after ${fails} failures: ${err.message}`);
       log(`poll failed: ${err.message}`);
-      await sleep(wait);
+      await nap();
       continue;
     }
 
     const date = lastDay(data);
-    if (date !== day) {
+    if (!date) {
+      if (++fails >= MAX_FAILS) throw new Error(`giving up after ${fails} failures: no days in response`);
+      log('poll returned no days');
+      await nap();
+      continue;
+    }
+    fails = 0;
+
+    if (day === null) {
+      log(`furthest bookable day is ${date}${date === target ? ' (window already open)' : ''}`);
+    } else if (date !== day) {
       log(`*** window opened: ${day} -> ${date} ***`);
-      day = date;
       saidWould = null;
+    }
+    day = date;
+
+    // Earlier days carry previous nights' bookings: exiting on them, or booking
+    // around them, acts on the wrong day. >= so a release past the target
+    // (catch-up, longer horizon) still books. Dry runs report throughout.
+    const windowOpen = date >= target;
+    if (!windowOpen && !prefs.dryRun) {
+      await nap();
+      continue;
     }
 
     const held = findState(data, date, prefs, ['BOOKED']);
@@ -284,7 +327,7 @@ async function run() {
       log('nothing bookable, still camping');
     }
 
-    await sleep(wait);
+    await nap();
   }
 
   if (prefs.dryRun) return log('camp ended (dry run)');
