@@ -46,7 +46,7 @@ async function getClasses() {
   const res = await call('GET', CLASSES);
 
   if (res.status === 401 || res.status === 403) {
-    throw Object.assign(new Error('auth expired, re-capture CURL_COMMAND'), { fatal: true });
+    throw Object.assign(new Error('auth expired, refresh the at/st cookies'), { fatal: true });
   }
   if (res.status === 429) {
     throw Object.assign(new Error('rate limited'), { throttled: true });

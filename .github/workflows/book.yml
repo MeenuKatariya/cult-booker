@@ -26,5 +26,7 @@ jobs:
 
       - run: node index.js run
         env:
-          CURL_COMMAND: ${{ secrets.CURL_COMMAND }}
+          CULT_AT: ${{ secrets.CULT_AT }}
+          CULT_ST: ${{ secrets.CULT_ST }}
+          CULT_API_KEY: ${{ secrets.CULT_API_KEY }}
           DRY_RUN: ${{ vars.DRY_RUN }}

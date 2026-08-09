@@ -27,18 +27,18 @@ same day.
 
 ## Setup
 
-### 1. Grab your session
+### 1. Grab your session cookies
 
-Sign in at cult.fit in Chrome. Open DevTools, go to Network, filter for `api/cult`, reload, and
-find a request whose response has a top-level `days` array. Right-click it, Copy as cURL.
-
-Save it straight to a file, since the clipboard is easy to lose:
+Sign in at cult.fit in Chrome. Open DevTools, go to the Application tab, expand Cookies, click
+`https://www.cult.fit`, and copy the values of the `at` and `st` cookies. Then in the Network tab
+click any `/api/cult/` request and copy the `apikey` request header.
 
 ```bash
-pbpaste > ~/cult.curl && export CURL_COMMAND="$(cat ~/cult.curl)"
+export CULT_AT='<at value>' CULT_ST='<st value>' CULT_API_KEY='<apikey header>'
 ```
 
-The request has to be one made while signed in. A static asset parses fine but carries no session.
+The cookies are the session and expire eventually; the apikey is the web client's identifier and
+stays stable.
 
 ### 2. Find your centers and workouts
 
@@ -93,7 +93,8 @@ records when the window opened.
 
 ### 5. Run it on GitHub Actions
 
-- Settings, Secrets and variables, Actions, Secrets: `CURL_COMMAND` set to the copied curl.
+- Settings, Secrets and variables, Actions, Secrets: `CULT_AT`, `CULT_ST` and `CULT_API_KEY`
+  set to the values from step 1.
 - Same page, Variables: `DRY_RUN` set to `true`, flipped to `false` once a dry night looks right.
 
 Run it once by hand from the Actions tab to check the wiring.
@@ -129,8 +130,8 @@ cult from outside India.
 
 ## When it breaks
 
-`auth expired, re-capture CURL_COMMAND` means the `at` and `st` cookies are stale. Redo step 1 and
-update the secret. The run exits non-zero, so GitHub emails you.
+`auth expired` in the log means the `at` and `st` cookies are stale. Redo step 1 and update the
+two secrets. The run exits non-zero, so GitHub emails you.
 
 If the schedule goes quiet, check the Actions tab. GitHub disables scheduled workflows in a repo
 with no commits for 60 days. Any commit or manual run resets it.
@@ -142,5 +143,5 @@ times, states and seat counts. Error bodies are cut at 200 characters. `--raw` i
 debugging and isn't used in CI. Secrets are encrypted and masked, and there's no `pull_request`
 trigger, so forks can't reach them.
 
-`~/cult.curl` holds live session cookies in plain text. It lives outside the repo and `*.curl` is
-gitignored, but treat it like a password.
+The `at` and `st` values are live session credentials. Keep them in the two secrets and your
+shell environment only; never in a committed file.
