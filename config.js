@@ -3,22 +3,22 @@
 const fs = require('fs');
 const path = require('path');
 
+const API_DUMMY_KEY = '9d153009-e961-4718-a343-2a36b0a1d1fd';
+
 function loadAuth() {
   const at = process.env.CULT_AT;
   const st = process.env.CULT_ST;
-  const apikey = process.env.CULT_API_KEY;
 
-  const missing = [!at && 'CULT_AT', !st && 'CULT_ST', !apikey && 'CULT_API_KEY'].filter(Boolean);
-  if (missing.length) {
+  if (!at || !st) {
     throw new Error(
-      `${missing.join(', ')} not set. Sign in at cult.fit; the "at" and "st" values are under ` +
-      'DevTools > Application > Cookies, and "apikey" is a request header on any /api/cult/ call.'
+      `${!at ? 'CULT_AT' : 'CULT_ST'} is not set. Sign in at cult.fit, open DevTools, ` +
+      'Application tab, Cookies, https://www.cult.fit, and copy the "at" and "st" values.'
     );
   }
 
   return {
     headers: {
-      apikey,
+      apikey: API_DUMMY_KEY,
       appversion: '7',
       osname: 'browser',
       timezone: 'Asia/Kolkata',

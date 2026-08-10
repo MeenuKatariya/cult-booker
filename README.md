@@ -30,15 +30,11 @@ same day.
 ### 1. Grab your session cookies
 
 Sign in at cult.fit in Chrome. Open DevTools, go to the Application tab, expand Cookies, click
-`https://www.cult.fit`, and copy the values of the `at` and `st` cookies. Then in the Network tab
-click any `/api/cult/` request and copy the `apikey` request header.
+`https://www.cult.fit`, and copy the values of the `at` and `st` cookies:
 
 ```bash
-export CULT_AT='<at value>' CULT_ST='<st value>' CULT_API_KEY='<apikey header>'
+export CULT_AT='<at value>' CULT_ST='<st value>'
 ```
-
-The cookies are the session and expire eventually; the apikey is the web client's identifier and
-stays stable.
 
 ### 2. Find your centers and workouts
 
@@ -93,8 +89,8 @@ records when the window opened.
 
 ### 5. Run it on GitHub Actions
 
-- Settings, Secrets and variables, Actions, Secrets: `CULT_AT`, `CULT_ST` and `CULT_API_KEY`
-  set to the values from step 1.
+- Settings, Secrets and variables, Actions, Secrets: `CULT_AT` and `CULT_ST` set to the two
+  cookie values.
 - Same page, Variables: `DRY_RUN` set to `true`, flipped to `false` once a dry night looks right.
 
 Run it once by hand from the Actions tab to check the wiring.
