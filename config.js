@@ -30,10 +30,35 @@ function loadAuth() {
   };
 }
 
+const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
 function loadPrefs() {
   const prefs = JSON.parse(fs.readFileSync(path.join(__dirname, 'preferences.json'), 'utf8'));
+
+  if (!Array.isArray(prefs.defaults?.slots) || !Array.isArray(prefs.defaults?.preferences)) {
+    throw new Error('preferences.json needs defaults.slots and defaults.preferences');
+  }
+  for (const [day, cfg] of Object.entries(prefs.days ?? {})) {
+    if (!WEEKDAYS.includes(day)) throw new Error(`unknown day "${day}" in preferences.json`);
+    for (const key of ['slots', 'preferences']) {
+      if (cfg[key] !== undefined && !Array.isArray(cfg[key])) {
+        throw new Error(`days.${day}.${key} must be an array`);
+      }
+    }
+  }
+
   if (process.env.DRY_RUN !== undefined) prefs.dryRun = process.env.DRY_RUN !== 'false';
   return prefs;
 }
 
-module.exports = { loadAuth, loadPrefs };
+// days absent: every day. days present: whitelist, unlisted rest, overrides replace wholesale.
+function planFor(prefs, weekday) {
+  const day = prefs.days ? prefs.days[weekday] : {};
+  if (!day) return null;
+  return {
+    slots: day.slots ?? prefs.defaults.slots,
+    preferences: day.preferences ?? prefs.defaults.preferences,
+  };
+}
+
+module.exports = { loadAuth, loadPrefs, planFor, WEEKDAYS };

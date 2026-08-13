@@ -1,10 +1,21 @@
 {
-  "slots": ["07:00:00"],
-  "preferences": [
-    { "centerId": "267", "centerName": "Cult HSR 14th Main", "workoutName": "HRX WORKOUT" },
-    { "centerId": "3", "centerName": "Cult HSR 19th Main", "workoutName": "HRX WORKOUT" },
-    { "centerId": "220", "centerName": "Cult HSR 24th Main", "workoutName": "HRX WORKOUT" }
-  ],
+  "defaults": {
+    "slots": ["07:00:00"],
+    "preferences": [
+      { "centerId": "267", "centerName": "Cult HSR 14th Main", "workoutName": "HRX WORKOUT" },
+      { "centerId": "3", "centerName": "Cult HSR 19th Main", "workoutName": "HRX WORKOUT" },
+      { "centerId": "220", "centerName": "Cult HSR 24th Main", "workoutName": "HRX WORKOUT" }
+    ]
+  },
+  "days": {
+    "monday": {},
+    "tuesday": {},
+    "wednesday": {},
+    "thursday": {},
+    "friday": {},
+    "saturday": { "slots": ["10:00:00"] },
+    "sunday": { "slots": ["10:00:00"] }
+  },
   "waitlistAsLastResort": true,
   "hotWindows": ["22:00"],
   "hotPollMs": 2000,

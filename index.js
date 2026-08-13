@@ -3,7 +3,7 @@
 // Runners are UTC, preferences.json is IST. Has to happen before any Date use.
 process.env.TZ = process.env.TZ || 'Asia/Kolkata';
 
-const { loadAuth, loadPrefs } = require('./config');
+const { loadAuth, loadPrefs, planFor, WEEKDAYS } = require('./config');
 
 const HOST = 'https://www.cult.fit';
 const CLASSES = '/api/cult/classes/v2?productType=FITNESS';
@@ -72,12 +72,12 @@ function* classesOn(data, date) {
 const norm = (s) => String(s ?? '').toUpperCase().replace(/\s+/g, ' ').trim();
 
 // Matched on name, not workoutId: 69 covers both HRX WORKOUT and ADIDAS STRENGTH+.
-function pick(data, date, prefs, states) {
+function pick(data, date, plan, states) {
   const all = [...classesOn(data, date)];
   const out = [];
 
-  for (const time of prefs.slots) {
-    for (const pref of prefs.preferences) {
+  for (const time of plan.slots) {
+    for (const pref of plan.preferences) {
       for (const cls of all) {
         if (cls.time !== time) continue;
         if (String(cls.centerId) !== String(pref.centerId)) continue;
@@ -91,8 +91,8 @@ function pick(data, date, prefs, states) {
   return out;
 }
 
-function findState(data, date, prefs, states) {
-  const centers = new Set(prefs.preferences.map((p) => String(p.centerId)));
+function findState(data, date, plan, states) {
+  const centers = new Set(plan.preferences.map((p) => String(p.centerId)));
 
   for (const cls of classesOn(data, date)) {
     if (!centers.has(String(cls.centerId))) continue;
@@ -214,14 +214,23 @@ async function run() {
   // yesterday's occurrence and take one short shot instead of camping to tomorrow.
   let anchor = windows.length ? Math.min(...windows) : nextAt('22:00', start);
   if (anchor > deadline) anchor -= 86_400_000;
-  const target = isoDate(anchor + DAYS_AHEAD * 86_400_000);
+  const targetTs = anchor + DAYS_AHEAD * 86_400_000;
+  const target = isoDate(targetTs);
+  const weekday = WEEKDAYS[new Date(targetTs).getDay()];
+
+  const plan = planFor(prefs, weekday);
+  if (!plan) {
+    log(`no booking configured for ${weekday} ${target}, nothing to do`);
+    return;
+  }
 
   if (windows.length && windows.every((t) => t > deadline)) {
     windows = [start];
     if (deadline - start > 30 * 60_000) deadline = start + 15 * 60_000;
   }
 
-  log(`camping until ${new Date(deadline).toLocaleString('en-GB')}, target day ${target}, dryRun=${prefs.dryRun}`);
+  log(`camping until ${new Date(deadline).toLocaleString('en-GB')}, target day ${target} (${weekday}), dryRun=${prefs.dryRun}`);
+  log(`plan: ${plan.slots.join('/')} at ${plan.preferences.map((p) => p.centerName ?? p.centerId).join(' > ')}`);
 
   let day = null;
   let fails = 0;
@@ -292,24 +301,24 @@ async function run() {
       continue;
     }
 
-    const held = findState(data, date, prefs, ['BOOKED']);
+    const held = findState(data, date, plan, ['BOOKED']);
     if (held && !prefs.dryRun) {
       log(`already booked on ${date}: ${describe(held)}`);
       return;
     }
 
-    let picks = pick(data, date, prefs, ['AVAILABLE']);
+    let picks = pick(data, date, plan, ['AVAILABLE']);
 
     // A real seat still beats a waitlist we already hold, but don't queue twice.
     if (!picks.length && prefs.waitlistAsLastResort) {
-      const queued = findState(data, date, prefs, ['WAITLISTED']);
+      const queued = findState(data, date, plan, ['WAITLISTED']);
       if (queued) {
         if (saidQueued !== date) {
           saidQueued = date;
           log(`already waitlisted on ${date}, leaving it alone`);
         }
       } else {
-        picks = pick(data, date, prefs, ['WAITLIST_AVAILABLE']);
+        picks = pick(data, date, plan, ['WAITLIST_AVAILABLE']);
       }
     }
 

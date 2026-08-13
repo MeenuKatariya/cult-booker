@@ -21,9 +21,8 @@ straight away; one starting before waits for it to appear, however late its firs
 lands.
 
 Once the new day is out it walks `slots` and `preferences` in order and books the first class with
-an open seat. Only
-when every combination is full does it fall back to a waitlist, and it won't queue twice for the
-same day.
+an open seat. Only when every combination is full does it fall back to a waitlist, and it won't
+queue twice for the same day.
 
 ## Setup
 
@@ -55,21 +54,44 @@ Two things to watch:
 
 ```json
 {
-  "slots": ["07:00:00"],
-  "preferences": [
-    { "centerId": "267", "centerName": "Cult HSR 14th Main", "workoutName": "HRX WORKOUT" }
-  ],
+  "defaults": {
+    "slots": ["07:00:00"],
+    "preferences": [
+      { "centerId": "267", "centerName": "Cult HSR 14th Main", "workoutName": "HRX WORKOUT" }
+    ]
+  },
+  "days": {
+    "monday": {},
+    "tuesday": {},
+    "wednesday": { "slots": ["19:00:00"] },
+    "thursday": {},
+    "friday": {}
+  },
   "waitlistAsLastResort": true,
   "hotWindows": ["22:00"],
   "hotPollMs": 2000,
-  "coolPollMs": 30000,
+  "coolPollMs": 300000,
   "campUntil": "22:30",
   "dryRun": true
 }
 ```
 
-`slots` and `preferences` are both ordered, and the search is slot-major: the first time is tried
+`defaults` holds the usual booking: `slots` (class times to try, in order) and `preferences`
+(center and workout combinations, in order). The search is slot-major, so the first time is tried
 at every center before moving to the next time. `centerName` is only a label for the logs.
+
+`days` names the weekdays of the classes you want, lowercase. It is the day of the **class**, not
+the night the script runs: the run four nights earlier does the booking. Three forms:
+
+- Day listed as `{}`: book that day with `defaults`.
+- Day listed with `slots` and/or `preferences`: those replace the default ones wholesale for that
+  day. Anything not overridden falls through to `defaults`. In the example, Wednesday is an
+  evening class and every other weekday is the 07:00 default.
+- Day missing: rest day. The run logs `no booking configured for <day>` and exits in seconds
+  without camping. Saturday and Sunday above.
+
+Leave `days` out entirely to book every day of the week with `defaults`. A misspelled day name
+fails at startup rather than becoming a silent rest day.
 
 `hotWindows` are the times it polls every `hotPollMs`, from 15 seconds before to three minutes
 after. The rest of the camp runs at `coolPollMs`. All times are IST.
