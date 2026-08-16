@@ -12,9 +12,7 @@
     "tuesday": {},
     "wednesday": {},
     "thursday": {},
-    "friday": {},
-    "saturday": { "slots": ["10:00:00"] },
-    "sunday": { "slots": ["10:00:00"] }
+    "friday": {}
   },
   "waitlistAsLastResort": true,
   "hotWindows": ["22:00"],
